@@ -23,6 +23,7 @@ class Action(str, Enum):
     REST = "rest"
     FLEE = "flee"
     ATTACK = "attack"
+    DEFEND = "defend"
     SEEK_MATE = "seek_mate"
     REPRODUCE = "reproduce"
     CLAIM_TERRITORY = "claim_territory"
@@ -30,6 +31,7 @@ class Action(str, Enum):
     JOIN_CLAN = "join_clan"
     FOLLOW_CLAN = "follow_clan"
     MIGRATE = "migrate"
+    COMMUNICATE = "communicate"
 
 
 # Distance thresholds for "right next to it" actions.
@@ -171,6 +173,26 @@ def score_actions(
     if energy_frac > 0.6 and p.nearby_food_count == 0 and p.nearby_enemies == 0:
         migrate_score = c.curiosity * 0.4 + 0.2
 
+    # ---- defend (stand ground on owned territory under threat) -------
+    defend_score = 0.0
+    if (p.closest_enemy is not None
+            and c.clan_id is not None
+            and p.is_on_own_clan_tile
+            and health_frac > 0.4):
+        defend_score = (
+            c.territoriality * 0.9
+            + c.genome.normalized("protection_instinct") * 0.5
+            + (1.0 - c.fear) * 0.3
+        )
+
+    # ---- communicate (clan-signal when allies around) ----------------
+    communicate_score = 0.0
+    if c.clan_id is not None and p.nearby_allies >= 1:
+        communicate_score = (
+            c.social_bonding * 0.35
+            + c.genome.normalized("negotiation_skill") * 0.25
+        )
+
     # ---- baseline -----------------------------------------------------
     move_random_score = 0.05 + 0.2 * c.curiosity + 0.1 * c.impulsiveness
     idle_score = 0.02
@@ -180,6 +202,7 @@ def score_actions(
         (Action.SEEK_FOOD, food_score),
         (Action.FLEE, flee_score),
         (Action.ATTACK, attack_score),
+        (Action.DEFEND, defend_score),
         (Action.REPRODUCE, repro_score),
         (Action.SEEK_MATE, mate_score),
         (Action.REST, rest_score),
@@ -188,6 +211,7 @@ def score_actions(
         (Action.JOIN_CLAN, join_clan_score),
         (Action.FOLLOW_CLAN, follow_score),
         (Action.MIGRATE, migrate_score),
+        (Action.COMMUNICATE, communicate_score),
         (Action.MOVE_RANDOM, move_random_score),
         (Action.IDLE, idle_score),
     ]

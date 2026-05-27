@@ -110,6 +110,14 @@ def attempt_reproduction(a: Creature, b: Creature, world, rng) -> int:
             break
         spawned += 1
         world.births_total += 1
+        world.emit("birth", {
+            "id": child.id,
+            "parents": [a.id, b.id],
+            "generation": child.generation,
+            "is_hybrid": is_hybrid,
+            "species": int(child.species_id),
+            "clan": child.clan_id,
+        })
 
     if spawned > 0:
         cost = a.repro_energy_cost * 0.5

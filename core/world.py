@@ -17,6 +17,7 @@ from core.creature_store import CreatureStore
 from core.food_store import FoodStore
 from core.grid import TerritoryGrid
 from core.spatial_grid import SpatialGrid
+from entities.archetype import Archetype, amplify_traits, classify
 from entities.clan import Clan
 from entities.creature import Creature
 from genetics.genome import Genome
@@ -65,6 +66,23 @@ class World:
         # territory grid; cleared by the renderer after redraw.
         self.territory_dirty: bool = True
 
+        # Per-tick gates flipped by Simulation._tick. Brain.step reads them
+        # so we throttle the expensive intents without scattering modulo
+        # checks across the action handlers.
+        self.allow_reproduce_tick: bool = True
+        self.allow_attack_tick: bool = True
+
+        # Optional Werld-style observation sink. Set by Simulation. Any
+        # subsystem (combat, reproduction, clan creation) can call
+        # `world.emit(kind, payload)` without knowing whether telemetry
+        # is wired or not.
+        self.telemetry = None
+
+    def emit(self, kind: str, payload: dict | None = None) -> None:
+        if self.telemetry is None:
+            return
+        self.telemetry.emit_event(self.tick, kind, payload)
+
     # ---------- Creatures --------------------------------------------------
     def spawn_creature(
         self,
@@ -101,7 +119,10 @@ class World:
         creature.parent_a_id = parent_a_id
         creature.parent_b_id = parent_b_id
         creature.generation = generation
-        creature.attach_phenotype()
+        creature.attach_phenotype(rng=self.rng)
+        archetype = classify(genome, is_hybrid=is_hybrid)
+        creature.archetype = archetype.value
+        amplify_traits(creature, archetype)
         creature.color = genome_to_color(genome)
 
         store.energy[idx] = store.max_energy[idx] * energy_fraction
@@ -134,6 +155,7 @@ class World:
                 clan.remove_member(cid)
                 if not clan.alive:
                     self.clans.pop(clan.id, None)
+                    self.emit("clan_dissolved", {"id": clan.id})
         self.species.remove_member(int(self.store.species_id[idx]))
         self.creature_by_idx[idx] = None
         self.store.release(idx)
@@ -169,6 +191,10 @@ class World:
         clan.aggression_level = 0.3 + 0.7 * founder.aggression
         clan.ideology = founder.aggression
         self.clans[clan_id] = clan
+        self.emit("clan_created", {
+            "id": clan_id, "founder": founder.id,
+            "aggression": clan.aggression_level,
+        })
         return clan
 
     def join_clan(self, creature: Creature, clan: Clan) -> None:

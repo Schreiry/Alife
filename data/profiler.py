@@ -28,6 +28,13 @@ class PerformanceProfiler:
         self.counters: Dict[str, int] = {}
         self.last_frame_ms: float = 0.0
         self._frame_start: float = 0.0
+        # Watchdog state. Updated by Simulation each tick so a long pause
+        # is attributable to a *specific* section rather than "somewhere".
+        self.last_tick_ms: float = 0.0
+        self.last_tick_wall_time: float = time.time()
+        self.last_phase: str = "init"
+        self.last_exception: Optional[str] = None
+        self.slow_tick_count: int = 0
 
     # ---------- sections -------------------------------------------------
     def start_section(self, name: str) -> None:
@@ -108,6 +115,35 @@ class PerformanceProfiler:
 
     def end_frame(self) -> None:
         self.last_frame_ms = (time.perf_counter() - self._frame_start) * 1000.0
+
+    # ---------- watchdog ----------------------------------------------
+    def mark_phase(self, name: str) -> None:
+        """Cheap label. Set right before entering a non-trivial section so
+        a hard hang in that section leaves a forensic trail."""
+        self.last_phase = name
+
+    def note_tick(self, tick_ms: float, threshold_ms: float = 0.0) -> Optional[str]:
+        """Record the latest tick. If `threshold_ms > 0` and the tick was
+        slower, returns a one-line diagnostic string the caller can log."""
+        self.last_tick_ms = tick_ms
+        self.last_tick_wall_time = time.time()
+        if threshold_ms > 0.0 and tick_ms > threshold_ms:
+            self.slow_tick_count += 1
+            slow_name, slow_ms = self.slowest_section()
+            counters_str = " ".join(
+                f"{k}={v}" for k, v in list(self.counters.items())[:6]
+            )
+            return (
+                f"[watchdog] slow tick {tick_ms:.1f}ms (phase={self.last_phase}) "
+                f"hot={slow_name}:{slow_ms:.1f}ms {counters_str}"
+            )
+        return None
+
+    def snapshot(self) -> Dict[str, float]:
+        """Plain dict view of recent timings — for observatory JSON dump."""
+        return {
+            name: self.get_average(name) for name in self._sections
+        }
 
 
 class _SectionContext:

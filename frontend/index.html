@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ALife Observatory</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header id="topbar">
+    <span class="brand">ALife Observatory</span>
+    <span class="metric"><b id="m-tick">0</b><i>tick</i></span>
+    <span class="metric"><b id="m-pop">0</b><i>pop</i></span>
+    <span class="metric"><b id="m-food">0</b><i>food</i></span>
+    <span class="metric"><b id="m-species">0</b><i>species</i></span>
+    <span class="metric"><b id="m-clans">0</b><i>clans</i></span>
+    <span class="metric"><b id="m-hybrids">0</b><i>hybrids</i></span>
+    <span class="metric"><b id="m-gen">0</b><i>gen max</i></span>
+    <span class="metric"><b id="m-births">0</b><i>births</i></span>
+    <span class="metric"><b id="m-deaths">0</b><i>deaths</i></span>
+    <span class="metric perf"><b id="m-tickms">0.0</b><i>ms/tick</i></span>
+    <span class="metric perf"><b id="m-clientfps">0</b><i>ui fps</i></span>
+    <span class="metric perf"><b id="m-wsfps">0</b><i>ws hz</i></span>
+    <span class="metric perf"><b id="m-hot">-</b><i>hot section</i></span>
+    <span class="metric perf"><b id="m-status">init</b><i>state</i></span>
+    <span class="grow"></span>
+    <span class="controls">
+      <button id="btn-pause">Pause</button>
+      <button id="btn-step">Step</button>
+      <button id="btn-reset">Reset</button>
+      <button id="btn-save">Save</button>
+      <button id="btn-load">Load</button>
+      <label class="speed">
+        Speed <select id="sel-speed"></select>
+      </label>
+    </span>
+  </header>
+
+  <main>
+    <section id="map-section">
+      <canvas id="map"></canvas>
+      <div id="map-overlay">
+        <div id="legend">
+          <span class="dot food"></span> food
+          <span class="dot creature"></span> creature
+          <span class="dot clan-ring"></span> clan ring
+          <span id="hover-info"></span>
+        </div>
+      </div>
+    </section>
+
+    <aside id="inspector">
+      <div class="tabs">
+        <button class="tab active" data-tab="creature">Creature</button>
+        <button class="tab" data-tab="clans">Clans</button>
+        <button class="tab" data-tab="species">Species</button>
+      </div>
+
+      <div class="tab-pane" data-pane="creature">
+        <div id="inspector-empty">click a creature on the map</div>
+        <div id="inspector-content" hidden>
+          <div class="row"><label>id</label><span id="ic-id">-</span></div>
+          <div class="row"><label>archetype</label><span id="ic-archetype">-</span></div>
+          <div class="row"><label>age / lifespan</label><span id="ic-age">-</span></div>
+          <div class="row"><label>generation</label><span id="ic-gen">-</span></div>
+          <div class="row"><label>species</label><span id="ic-species">-</span></div>
+          <div class="row"><label>clan</label><span id="ic-clan">-</span></div>
+          <div class="row"><label>sex</label><span id="ic-sex">-</span></div>
+          <div class="row"><label>hybrid</label><span id="ic-hybrid">-</span></div>
+          <div class="row"><label>energy</label><span id="ic-energy">-</span></div>
+          <div class="row"><label>health</label><span id="ic-health">-</span></div>
+          <div class="row"><label>last action</label><span id="ic-action">-</span></div>
+          <div class="row"><label>parents</label><span id="ic-parents">-</span></div>
+          <h4>genome (170)</h4>
+          <div id="ic-genome"></div>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-pane="clans" hidden>
+        <div id="clan-list" class="entity-list"></div>
+      </div>
+
+      <div class="tab-pane" data-pane="species" hidden>
+        <div id="species-list" class="entity-list"></div>
+      </div>
+    </aside>
+  </main>
+
+  <section id="bottom-panel">
+    <div class="chart-card">
+      <h4>population &amp; food</h4>
+      <canvas class="chart" data-series="population,food" data-colors="#f0c864,#5ac85a"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>births / deaths (per window)</h4>
+      <canvas class="chart" data-series="births_delta,deaths_delta" data-colors="#7af2c4,#ff7373"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>species &amp; clans</h4>
+      <canvas class="chart" data-series="species,clans" data-colors="#7ab7ff,#ff8b6e"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>avg aggression / intel</h4>
+      <canvas class="chart" data-series="avg_aggression,avg_intelligence" data-colors="#ff7373,#7af2c4"></canvas>
+    </div>
+    <div class="chart-card events">
+      <h4>events <span id="ev-counts"></span></h4>
+      <pre id="event-log"></pre>
+    </div>
+    <div class="chart-card profiler">
+      <h4>profiler (ms avg)</h4>
+      <table id="prof-table"></table>
+    </div>
+  </section>
+
+  <script src="/static/api.js"></script>
+  <script src="/static/charts.js"></script>
+  <script src="/static/renderer.js"></script>
+  <script src="/static/controls.js"></script>
+  <script src="/static/panels.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

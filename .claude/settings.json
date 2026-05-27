@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(.venv/Scripts/python.exe main.py --benchmark 600)",
+      "Bash(.venv/Scripts/python.exe main.py --benchmark 3000)",
+      "Bash(.venv/Scripts/python.exe -c \"import fastapi, uvicorn; print\\('fastapi', fastapi.__version__\\); print\\('uvicorn', uvicorn.__version__\\)\")",
+      "Bash(.venv/Scripts/python.exe -m pip install fastapi \"uvicorn[standard]\")",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(rm -f telemetry.db checkpoint_auto.json checkpoint_auto.json.* test_ckpt.json test_ckpt.json.*)",
+      "Bash(.venv/Scripts/python.exe main.py --experiment benchmark --ticks 600 --seed 42 --out /tmp/exp_bench.json)",
+      "Bash(.venv/Scripts/python.exe -c ' *)",
+      "Bash(.venv/Scripts/python.exe main.py --experiment benchmark --ticks 600 --seed 42 --out exp_bench.json)",
+      "Bash(.venv/Scripts/python.exe main.py --experiment survival_arena --ticks 300 --seed 1 --out exp_surv.json)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 39224)",
+      "Bash(taskkill //F //IM python.exe 2>&1 | head -3 *)",
+      "Bash(rm -f telemetry.db telemetry.db-* checkpoint_auto.json checkpoint_auto.json.*)",
+      "Bash(.venv/Scripts/python.exe main.py --benchmark 1500)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}
