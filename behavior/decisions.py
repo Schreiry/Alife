@@ -23,6 +23,7 @@ class Action(str, Enum):
     REST = "rest"
     FLEE = "flee"
     ATTACK = "attack"
+    DEFEND = "defend"
     SEEK_MATE = "seek_mate"
     REPRODUCE = "reproduce"
     CLAIM_TERRITORY = "claim_territory"
@@ -30,6 +31,7 @@ class Action(str, Enum):
     JOIN_CLAN = "join_clan"
     FOLLOW_CLAN = "follow_clan"
     MIGRATE = "migrate"
+    COMMUNICATE = "communicate"
 
 
 # Distance thresholds for "right next to it" actions.
@@ -119,10 +121,14 @@ def score_actions(
         if p.closest_mate_dist <= MATE_DISTANCE:
             repro_score = mate_score + 1.5
 
-    # ---- rest ---------------------------------------------------------
+    # ---- rest (recover health; only when we can AFFORD to sit still) --
+    # Rest heals but does NOT restore energy, so a hungry creature must never
+    # rest — it would just freeze in place and slowly starve (this was the
+    # "everyone stands still" bug under food scarcity). Rest only with energy
+    # headroom and a real health deficit, and never under threat.
     rest_score = 0.0
-    if energy_frac < 0.4 and p.closest_enemy is None:
-        rest_score = (1.0 - energy_frac) * 0.6 + 0.2 * c.self_preservation
+    if p.closest_enemy is None and energy_frac > 0.5 and health_frac < 0.7:
+        rest_score = (1.0 - health_frac) * 0.5 + 0.15 * c.self_preservation
 
     # ---- territory ----------------------------------------------------
     claim_score = 0.0
@@ -167,9 +173,42 @@ def score_actions(
     if c.clan_id is not None and p.closest_ally is not None and p.closest_ally_dist > 4.0:
         follow_score = c.pack_instinct * 0.5 + c.cooperation * 0.3
 
+    # Directed relocation toward richer ground (_do_migrate heads for the best
+    # nearby ecology cell). Three triggers, in priority order:
+    #   (a) hungry with no food in sight -> go look for it (replaces the old
+    #       rest/idle freeze that left hungry creatures standing still);
+    #   (b) the local cell is over-grazed / food-poor -> move on;
+    #   (c) comfortable + curious + nothing edible adjacent -> explore.
     migrate_score = 0.0
-    if energy_frac > 0.6 and p.nearby_food_count == 0 and p.nearby_enemies == 0:
-        migrate_score = c.curiosity * 0.4 + 0.2
+    if p.nearby_enemies == 0:
+        local_scarcity = max(p.resource_depletion, 1.0 - p.local_food)
+        migration_drive = c.genome.normalized("migration_drive")
+        if hunger > 0.45 and p.closest_food_idx < 0:
+            migrate_score = 0.6 + 0.6 * hunger + 0.3 * migration_drive
+        elif local_scarcity > 0.35 and energy_frac > 0.25:
+            migrate_score = 0.2 + 0.9 * local_scarcity * migration_drive + 0.3 * c.curiosity
+        elif energy_frac > 0.6 and p.nearby_food_count == 0:
+            migrate_score = 0.2 + 0.4 * c.curiosity
+
+    # ---- defend (stand ground on owned territory under threat) -------
+    defend_score = 0.0
+    if (p.closest_enemy is not None
+            and c.clan_id is not None
+            and p.is_on_own_clan_tile
+            and health_frac > 0.4):
+        defend_score = (
+            c.territoriality * 0.9
+            + c.genome.normalized("protection_instinct") * 0.5
+            + (1.0 - c.fear) * 0.3
+        )
+
+    # ---- communicate (clan-signal when allies around) ----------------
+    communicate_score = 0.0
+    if c.clan_id is not None and p.nearby_allies >= 1:
+        communicate_score = (
+            c.social_bonding * 0.35
+            + c.genome.normalized("negotiation_skill") * 0.25
+        )
 
     # ---- baseline -----------------------------------------------------
     move_random_score = 0.05 + 0.2 * c.curiosity + 0.1 * c.impulsiveness
@@ -180,6 +219,7 @@ def score_actions(
         (Action.SEEK_FOOD, food_score),
         (Action.FLEE, flee_score),
         (Action.ATTACK, attack_score),
+        (Action.DEFEND, defend_score),
         (Action.REPRODUCE, repro_score),
         (Action.SEEK_MATE, mate_score),
         (Action.REST, rest_score),
@@ -188,6 +228,7 @@ def score_actions(
         (Action.JOIN_CLAN, join_clan_score),
         (Action.FOLLOW_CLAN, follow_score),
         (Action.MIGRATE, migrate_score),
+        (Action.COMMUNICATE, communicate_score),
         (Action.MOVE_RANDOM, move_random_score),
         (Action.IDLE, idle_score),
     ]

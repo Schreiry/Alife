@@ -14,9 +14,11 @@ import numpy as np
 
 import config
 from core.creature_store import CreatureStore
+from core.ecology import ResourceEcology
 from core.food_store import FoodStore
 from core.grid import TerritoryGrid
 from core.spatial_grid import SpatialGrid
+from entities.archetype import Archetype, amplify_traits, classify
 from entities.clan import Clan
 from entities.creature import Creature
 from genetics.genome import Genome
@@ -42,6 +44,10 @@ class World:
         self.species = SpeciesRegistry(distance_threshold=config.SPECIES_DISTANCE_THRESHOLD)
 
         self.territory = TerritoryGrid(config.WORLD_WIDTH, config.WORLD_HEIGHT)
+        self.ecology = ResourceEcology(config.WORLD_WIDTH, config.WORLD_HEIGHT, rng)
+        # Famine/bloom debounce flag — flipped by Simulation when the live
+        # food supply crosses the famine/bloom thresholds.
+        self.in_famine: bool = False
         self.creature_grid = SpatialGrid(
             config.WORLD_WIDTH, config.WORLD_HEIGHT, config.SPATIAL_HASH_CELL,
         )
@@ -51,6 +57,13 @@ class World:
 
         self._next_creature_id: int = 1
         self._next_clan_id: int = 1
+
+        # Mean position of all living creatures, refreshed each tick in
+        # rebuild_grids. Lonely reproduction-ready creatures steer toward it
+        # when no mate is reachable, so a sparse population re-aggregates
+        # instead of drifting apart into reproductive isolation.
+        self.centroid_x: float = config.WORLD_WIDTH * 0.5
+        self.centroid_y: float = config.WORLD_HEIGHT * 0.5
 
         # Cumulative stats — incremented from various subsystems.
         self.births_total: int = 0
@@ -65,6 +78,46 @@ class World:
         # territory grid; cleared by the renderer after redraw.
         self.territory_dirty: bool = True
 
+        # Per-tick gates flipped by Simulation._tick. Brain.step reads them
+        # so we throttle the expensive intents without scattering modulo
+        # checks across the action handlers.
+        self.allow_reproduce_tick: bool = True
+        self.allow_attack_tick: bool = True
+
+        # Optional Werld-style observation sink. Set by Simulation. Any
+        # subsystem (combat, reproduction, clan creation) can call
+        # `world.emit(kind, payload)` without knowing whether telemetry
+        # is wired or not.
+        self.telemetry = None
+
+        # Ring buffer of recent positioned "something happened HERE" markers
+        # (war, new clan, new species, alliance). The live snapshot ships the
+        # recent ones; the renderer fades them by age. View-only.
+        self.signals: List[dict] = []
+
+    def emit(self, kind: str, payload: dict | None = None) -> None:
+        if self.telemetry is None:
+            return
+        self.telemetry.emit_event(self.tick, kind, payload)
+
+    def push_signal(self, kind: str, x: float, y: float,
+                    payload: dict | None = None) -> None:
+        """Record a positioned event marker AND mirror it to telemetry.
+
+        `payload` is merged into the telemetry event (with coords); the map
+        signal itself only needs kind + position.
+        """
+        self.signals.append({
+            "tick": self.tick, "kind": kind,
+            "x": round(float(x), 1), "y": round(float(y), 1),
+        })
+        if len(self.signals) > config.SIGNAL_BUFFER_MAX:
+            del self.signals[:-config.SIGNAL_BUFFER_MAX]
+        ev = dict(payload or {})
+        ev["x"] = round(float(x), 1)
+        ev["y"] = round(float(y), 1)
+        self.emit(kind, ev)
+
     # ---------- Creatures --------------------------------------------------
     def spawn_creature(
         self,
@@ -77,6 +130,7 @@ class World:
         generation: int = 0,
         clan_id: Optional[int] = None,
         is_hybrid: bool = False,
+        parent_species_id: Optional[int] = None,
         energy_fraction: float = config.START_ENERGY_FRACTION,
         health_fraction: float = config.START_HEALTH_FRACTION,
     ) -> Optional[Creature]:
@@ -101,13 +155,24 @@ class World:
         creature.parent_a_id = parent_a_id
         creature.parent_b_id = parent_b_id
         creature.generation = generation
-        creature.attach_phenotype()
+        creature.attach_phenotype(rng=self.rng)
+        archetype = classify(genome, is_hybrid=is_hybrid)
+        creature.archetype = archetype.value
+        amplify_traits(creature, archetype)
         creature.color = genome_to_color(genome)
 
         store.energy[idx] = store.max_energy[idx] * energy_fraction
         store.health[idx] = store.max_health[idx] * health_fraction
 
-        species_id = self.species.assign(genome, cid, self.tick, creature.color)
+        # Offspring inherit their parent species directly; new species arise
+        # only through cladogenesis (SpeciesRegistry.detect_splits), never by
+        # re-clustering newborns. Parentless creatures (world seed, immigration
+        # reseed) go through founder assignment.
+        if parent_species_id is not None and parent_species_id in self.species.species:
+            species_id = parent_species_id
+            self.species.register_member(species_id)
+        else:
+            species_id = self.species.assign(genome, cid, self.tick, creature.color)
         store.species_id[idx] = species_id
 
         if clan_id is not None and clan_id in self.clans:
@@ -134,6 +199,7 @@ class World:
                 clan.remove_member(cid)
                 if not clan.alive:
                     self.clans.pop(clan.id, None)
+                    self.emit("clan_dissolved", {"id": clan.id})
         self.species.remove_member(int(self.store.species_id[idx]))
         self.creature_by_idx[idx] = None
         self.store.release(idx)
@@ -169,6 +235,12 @@ class World:
         clan.aggression_level = 0.3 + 0.7 * founder.aggression
         clan.ideology = founder.aggression
         self.clans[clan_id] = clan
+        # A new clan is "something new" born at the founder's location — give
+        # it a positioned signal so the map can mark it.
+        self.push_signal("clan_created", founder.x, founder.y, {
+            "id": clan_id, "name": clan.name, "founder": founder.id,
+            "aggression": round(clan.aggression_level, 3),
+        })
         return clan
 
     def join_clan(self, creature: Creature, clan: Clan) -> None:
@@ -188,6 +260,10 @@ class World:
         self.food_grid.rebuild(
             self.food_store.x, self.food_store.y, self.food_store.alive,
         )
+        alive = self.store.alive
+        if alive.any():
+            self.centroid_x = float(self.store.x[alive].mean())
+            self.centroid_y = float(self.store.y[alive].mean())
 
     # ---------- Queries ----------------------------------------------------
     def population(self) -> int:

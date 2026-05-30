@@ -51,6 +51,11 @@ def resolve_attack(attacker: Creature, defender: Creature, world, rng) -> None:
 
         world.deaths_total += 1
         world.deaths_by_combat += 1
+        world.emit("death", {
+            "id": defender.id, "cause": "combat",
+            "killer": attacker.id, "age": defender.age,
+            "generation": defender.generation,
+        })
 
 
 def _adjust_relations(world, clan_a: int, clan_b: int, delta: float) -> None:

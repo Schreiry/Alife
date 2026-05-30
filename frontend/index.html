@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>λ.life · Observatory</title>
+  <link rel="stylesheet" href="/static/styles.css?v=7" />
+</head>
+<body>
+  <header id="topbar">
+    <span class="brand"><b>λ</b>.life<i>Observatory</i></span>
+    <nav class="page-nav">
+      <a class="nav-link active" href="/">Map</a>
+      <a class="nav-link" href="/analytics">Analytics</a>
+    </nav>
+    <span class="tb-sep"></span>
+    <div class="mgroup">
+      <span class="metric hero"><b id="m-tick">0</b><i>tick</i></span>
+      <span class="metric hero"><b id="m-pop">0</b><i>population</i></span>
+    </div>
+    <span class="tb-sep"></span>
+    <div class="mgroup">
+      <span class="metric"><b id="m-species">0</b><i>species</i></span>
+      <span class="metric"><b id="m-clans">0</b><i>clans</i></span>
+      <span class="metric"><b id="m-hybrids">0</b><i>hybrids</i></span>
+      <span class="metric"><b id="m-gen">0</b><i>gen</i></span>
+    </div>
+    <span class="tb-sep"></span>
+    <div class="mgroup">
+      <span class="metric"><b id="m-food">0</b><i>food</i></span>
+      <span class="metric"><b id="m-births">0</b><i>births</i></span>
+      <span class="metric"><b id="m-deaths">0</b><i>deaths</i></span>
+    </div>
+    <span class="grow"></span>
+    <div class="mgroup perf">
+      <span class="metric perf"><b id="m-tickms">0.0</b><i>ms/tick</i></span>
+      <span class="metric perf"><b id="m-clientfps">0</b><i>fps</i></span>
+      <span class="metric perf"><b id="m-wsfps">0</b><i>ws hz</i></span>
+      <span class="metric perf"><b id="m-hot">-</b><i>hot</i></span>
+      <span class="metric perf"><b id="m-status">init</b><i>state</i></span>
+    </div>
+    <span class="tb-sep"></span>
+    <span class="controls">
+      <button id="btn-pause">Pause</button>
+      <button id="btn-step">Step</button>
+      <button id="btn-reset">Reset</button>
+      <button id="btn-save">Save</button>
+      <button id="btn-load">Load</button>
+      <label class="speed">Speed <select id="sel-speed"></select></label>
+    </span>
+  </header>
+
+  <main>
+    <section id="map-section">
+      <canvas id="map"></canvas>
+      <div id="map-overlay">
+        <div id="layer-dock">
+          <div class="dock-row">
+            <span class="dock-label">View</span>
+            <button class="layer-btn active" data-mode="default">Normal</button>
+            <button class="layer-btn" data-mode="clan">Clans</button>
+            <button class="layer-btn" data-mode="species">Species</button>
+            <button class="layer-btn" data-mode="hunger">Hunger</button>
+          </div>
+          <div class="dock-row">
+            <span class="dock-label">Layers</span>
+            <button class="layer-toggle" data-overlay="territory">Territories</button>
+            <button class="layer-toggle" data-overlay="borders">Borders</button>
+            <button class="layer-toggle" data-overlay="ecology">Food</button>
+            <button class="layer-toggle active" data-overlay="glow" title="Same-clan creatures glow when grouped">Cohesion</button>
+          </div>
+          <div class="dock-row">
+            <span class="dock-label">Zoom</span>
+            <button class="zoom-btn" data-zoom="out" title="Zoom out">&minus;</button>
+            <button class="zoom-btn" data-zoom="in" title="Zoom in">+</button>
+            <button class="zoom-btn" data-zoom="reset" title="Reset view">Reset</button>
+          </div>
+        </div>
+        <div id="hover-chip"><span id="hover-info"></span></div>
+
+        <div id="panel-launcher">
+          <button class="pl-btn" data-tab="creature" title="Inspect a creature">◎<span>Creature</span></button>
+          <button class="pl-btn" data-tab="clans" title="Clans">⬡<span>Clans</span></button>
+          <button class="pl-btn" data-tab="species" title="Species">✦<span>Species</span></button>
+        </div>
+
+        <div id="map-hint" hidden>
+          <span class="mh-ring"></span>
+          <span class="mh-text">click a creature on the map</span>
+        </div>
+      </div>
+    </section>
+
+    <aside id="inspector">
+      <div class="panel-head">
+        <span class="panel-title" id="panel-title">Inspector</span>
+        <button id="panel-close" title="Close panel">✕</button>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="creature">Creature</button>
+        <button class="tab" data-tab="clans">Clans</button>
+        <button class="tab" data-tab="species">Species</button>
+      </div>
+
+      <div class="tab-pane" data-pane="creature">
+        <div id="inspector-empty" hidden>click a creature on the map</div>
+        <div id="inspector-content" hidden>
+          <div class="cre-head">
+            <div class="cre-id">#<span id="ic-id">—</span></div>
+            <div class="cre-arch" id="ic-archetype">—</div>
+          </div>
+
+          <div class="card pulse-card" title="Heart rate derived from action, energy and health. Blue = calm, green = active, red = stress, deep red = critical.">
+            <div class="pulse-head">
+              <span class="pulse-bpm"><b id="ic-pulse-rate">—</b><i>bpm</i></span>
+              <span class="pulse-state" id="ic-pulse-state">—</span>
+            </div>
+            <canvas id="pulse-canvas"></canvas>
+          </div>
+
+          <div class="card vitals">
+            <div class="vital">
+              <label>Energy <span id="ic-energy">—</span></label>
+              <div class="vbar"><div class="vfill energy" id="ic-energy-bar"></div></div>
+            </div>
+            <div class="vital">
+              <label>Health <span id="ic-health">—</span></label>
+              <div class="vbar"><div class="vfill health" id="ic-health-bar"></div></div>
+            </div>
+          </div>
+
+          <div class="cre-stats">
+            <div class="stat" title="Current age and the maximum lifespan this genome allows"><i>age / lifespan</i><b id="ic-age">—</b></div>
+            <div class="stat" title="Generations from the seeded ancestors"><i>generation</i><b id="ic-gen">—</b></div>
+            <div class="stat" title="Species id (emerges via cladogenesis)"><i>species</i><b id="ic-species">—</b></div>
+            <div class="stat" title="Clan membership"><i>clan</i><b id="ic-clan">—</b></div>
+            <div class="stat" title="Biological sex"><i>sex</i><b id="ic-sex">—</b></div>
+            <div class="stat" title="Born from a cross-species pairing?"><i>hybrid</i><b id="ic-hybrid">—</b></div>
+            <div class="stat wide" title="The behavior chosen on the latest tick"><i>last action</i><b id="ic-action">—</b></div>
+            <div class="stat wide" title="Parent creature ids"><i>parents</i><b id="ic-parents">—</b></div>
+          </div>
+
+          <h4>genome <span id="ic-gene-count"></span></h4>
+          <div id="ic-genome"></div>
+        </div>
+      </div>
+
+      <div class="tab-pane" data-pane="clans" hidden>
+        <div id="clan-list" class="entity-list"></div>
+      </div>
+
+      <div class="tab-pane" data-pane="species" hidden>
+        <div id="species-list" class="entity-list"></div>
+      </div>
+    </aside>
+  </main>
+
+  <section id="bottom-panel">
+    <div class="chart-card">
+      <h4>population &amp; food</h4>
+      <canvas class="chart" data-series="population,food" data-colors="#ff8a34,#7cb35c"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>births / deaths (per window)</h4>
+      <canvas class="chart" data-series="births_delta,deaths_delta" data-colors="#7cb35c,#ff5e47"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>species &amp; clans</h4>
+      <canvas class="chart" data-series="species,clans" data-colors="#8b94a6,#ff8a34"></canvas>
+    </div>
+    <div class="chart-card">
+      <h4>avg aggression / intel</h4>
+      <canvas class="chart" data-series="avg_aggression,avg_intelligence" data-colors="#ff5e47,#cf9054"></canvas>
+    </div>
+    <div class="chart-card profiler">
+      <h4>profiler (ms avg)</h4>
+      <table id="prof-table"></table>
+    </div>
+  </section>
+
+  <script src="/static/cursor.js?v=7"></script>
+  <script src="/static/api.js?v=7"></script>
+  <script src="/static/charts.js?v=7"></script>
+  <script src="/static/renderer.js?v=7"></script>
+  <script src="/static/controls.js?v=7"></script>
+  <script src="/static/panels.js?v=7"></script>
+  <script src="/static/app.js?v=7"></script>
+</body>
+</html>

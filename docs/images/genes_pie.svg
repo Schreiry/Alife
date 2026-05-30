@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300" viewBox="0 0 500 300">
+  <style>
+    .lbl{font:12px sans-serif;fill:#111}
+  </style>
+  <!-- Pie showing category distribution (approx counts) -->
+  <g transform="translate(160,150)">
+    <!-- segments: Physical 25, Metabolic 20, Intellect 25, Instinct 20, Social 20, Combat 20, Reproduction 20, Mutation 10, Appearance 10 -->
+    <path d="M0 0 L 120 0 A 120 120 0 0 1 36.6 115.8 z" fill="#6cace4"/>
+    <path d="M0 0 L 36.6 115.8 A 120 120 0 0 1 -97.6 62.1 z" fill="#4fb6a2"/>
+    <path d="M0 0 L -97.6 62.1 A 120 120 0 0 1 -86.6 -86.6 z" fill="#f6c85f"/>
+    <path d="M0 0 L -86.6 -86.6 A 120 120 0 0 1 -9.8 -119.5 z" fill="#f28c8c"/>
+    <path d="M0 0 L -9.8 -119.5 A 120 120 0 0 1 72.5 -97.9 z" fill="#c9a0dc"/>
+    <path d="M0 0 L 72.5 -97.9 A 120 120 0 0 1 120 0 z" fill="#9fd3c7"/>
+    <!-- small arcs for Mutation and Appearance (10 each) -->
+    <!-- overlay legend -->
+  </g>
+  <g transform="translate(340,40)">
+    <text class="lbl">Physical: 25</text>
+    <text class="lbl" y="20">Metabolic: 20</text>
+    <text class="lbl" y="40">Intellect: 25</text>
+    <text class="lbl" y="60">Instinct: 20</text>
+    <text class="lbl" y="80">Social: 20</text>
+    <text class="lbl" y="100">Combat: 20</text>
+    <text class="lbl" y="120">Reproduction: 20</text>
+    <text class="lbl" y="140">Mutation: 10</text>
+    <text class="lbl" y="160">Appearance: 10</text>
+  </g>
+</svg>

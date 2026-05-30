@@ -78,8 +78,13 @@ class CreatureStore:
         return idx
 
     def release(self, idx: int) -> None:
-        if not self.alive[idx]:
-            return
+        # Called exactly once per death by World.remove_creature, which pops
+        # the creature from its dict first and so already guards against a
+        # double free. We must NOT gate on `self.alive[idx]` here: the death
+        # flow sets alive=False (via Creature.kill) *before* this runs, so an
+        # alive-based guard would early-return and leak the slot — count would
+        # ratchet up to capacity, block all births, and drive the world to
+        # extinction.
         self.alive[idx] = False
         self.clan_id[idx] = -1
         self._free.append(idx)
