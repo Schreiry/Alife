@@ -19,7 +19,7 @@ class Creature:
         "_store", "_idx", "id", "genome",
         "parent_a_id", "parent_b_id", "generation",
         "death_cause", "color", "last_action",
-        "rage", "confidence",
+        "rage", "confidence", "archetype",
         # Cached normalized gene values used by the brain scoring.
         "aggression", "fear", "territoriality", "expansion_drive",
         "leadership", "social_bonding", "trust", "cooperation",
@@ -47,6 +47,7 @@ class Creature:
         self.last_action: str = "idle"
         self.rage: float = 0.0
         self.confidence: float = 0.5
+        self.archetype: str = "forager"  # overwritten by World.spawn_creature
         # Brain-side normalized values are filled by attach_phenotype.
 
     # ---------- store proxies ------------------------------------------
@@ -173,62 +174,91 @@ class Creature:
     def aging_speed(self) -> float: return float(self._store.aging_speed[self._idx])
 
     # ---------- behavior helpers --------------------------------------
-    def attach_phenotype(self) -> None:
+    def attach_phenotype(self, rng=None) -> None:
         """Compute cached real-valued stats from the genome and write them
-        into the store. Called once at spawn and after any mutation."""
+        into the store. Called once at spawn and after any mutation.
+
+        If `gene_expression_noise` > 0, the phenotype is computed from a
+        jittered copy of the genome — so genetically-identical siblings
+        end up slightly different. The heritable genome itself is NOT
+        touched."""
         g = self.genome
         s = self._store
         i = self._idx
-        s.max_health[i] = g.real("max_health")
-        s.max_energy[i] = g.real("energy_capacity")
-        s.move_speed[i] = g.real("movement_speed")
-        s.vision_range[i] = g.real("vision_range")
-        s.attack_power[i] = g.real("attack_power")
-        s.defense_power[i] = g.real("defense_power")
-        s.base_energy_cost[i] = g.real("base_energy_consumption")
-        s.move_energy_cost[i] = g.real("movement_energy_cost")
-        s.attack_energy_cost[i] = g.real("attack_energy_cost")
-        s.starvation_damage[i] = g.real("starvation_damage_rate")
-        s.regen_rate[i] = g.real("regeneration_rate")
-        s.lifespan[i] = int(g.real("lifespan"))
-        s.aging_speed[i] = g.real("aging_speed")
+
+        noise = g.normalized("gene_expression_noise")
+        if noise > 0.0 and rng is not None:
+            from genetics.mutation import expression_noise
+            from genetics.genes import GENE_INDEX, GENE_RANGES
+            noisy = expression_noise(g.values, rng, noise)
+
+            def real_of(name: str) -> float:
+                idx = GENE_INDEX[name]
+                lo, hi = GENE_RANGES[idx]
+                return lo + (hi - lo) * float(noisy[idx])
+
+            def norm_of(name: str) -> float:
+                return float(noisy[GENE_INDEX[name]])
+        else:
+            real_of = g.real
+            norm_of = g.normalized
+
+        s.max_health[i] = real_of("max_health")
+        s.max_energy[i] = real_of("energy_capacity")
+        s.move_speed[i] = real_of("movement_speed")
+        s.vision_range[i] = real_of("vision_range")
+        s.attack_power[i] = real_of("attack_power")
+        s.defense_power[i] = real_of("defense_power")
+        # Intelligence buys metabolic efficiency: a smarter creature budgets
+        # energy better, so it pays less just to exist. This is the fitness
+        # gradient that lets intelligence evolve *upward* under selection
+        # instead of drifting neutrally (which left it frozen / sliding to the
+        # winning species' arbitrary value). Discount capped at 30% so brains
+        # never trivialize hunger.
+        s.base_energy_cost[i] = real_of("base_energy_consumption") * (1.0 - 0.30 * norm_of("intelligence"))
+        s.move_energy_cost[i] = real_of("movement_energy_cost")
+        s.attack_energy_cost[i] = real_of("attack_energy_cost")
+        s.starvation_damage[i] = real_of("starvation_damage_rate")
+        s.regen_rate[i] = real_of("regeneration_rate")
+        s.lifespan[i] = int(real_of("lifespan"))
+        s.aging_speed[i] = real_of("aging_speed")
 
         # Brain-facing normalized scalars.
-        self.aggression = g.normalized("aggression")
-        self.fear = g.normalized("fear")
-        self.territoriality = g.normalized("territoriality")
-        self.expansion_drive = g.normalized("expansion_drive")
-        self.leadership = g.normalized("leadership")
-        self.social_bonding = g.normalized("social_bonding")
-        self.trust = g.normalized("trust")
-        self.cooperation = g.normalized("cooperation_instinct")
-        self.intelligence = g.normalized("intelligence")
-        self.curiosity = g.normalized("curiosity")
-        self.risk_analysis = g.normalized("risk_analysis")
-        self.self_preservation = g.normalized("self_preservation")
-        self.reproduction_drive = g.normalized("reproduction_drive")
-        self.food_search_efficiency = g.normalized("food_search_efficiency")
-        self.same_species_pref = g.normalized("same_species_preference")
-        self.outsider_tolerance = g.normalized("outsider_tolerance")
-        self.pack_instinct = g.normalized("pack_instinct")
-        self.altruism = g.normalized("altruism")
-        self.hunting_instinct = g.normalized("hunting_instinct")
-        self.parental_instinct = g.normalized("parental_instinct")
-        self.impulsiveness = g.normalized("impulsiveness")
-        self.clan_creation_chance_n = g.normalized("clan_creation_chance")
-        self.clan_joining_chance_n = g.normalized("clan_joining_chance")
-        self.incest_avoidance = g.normalized("incest_avoidance")
-        self.mate_selectiveness = g.normalized("mate_selectiveness")
-        self.fertility = g.real("fertility")
-        self.min_energy_repro_fraction = g.real("minimum_energy_for_mating")
-        self.min_age_repro = int(g.real("minimum_age_for_mating"))
-        self.mating_cooldown_ticks = int(g.real("mating_cooldown"))
-        self.retreat_threshold = g.real("retreat_threshold")
-        self.crit_chance = g.real("critical_chance")
-        self.dodge_chance = g.real("dodge_chance")
-        self.digestion_efficiency = g.real("digestion_efficiency")
-        self.energy_absorption = g.real("energy_absorption")
-        self.repro_energy_cost = g.real("reproduction_energy_cost")
+        self.aggression = norm_of("aggression")
+        self.fear = norm_of("fear")
+        self.territoriality = norm_of("territoriality")
+        self.expansion_drive = norm_of("expansion_drive")
+        self.leadership = norm_of("leadership")
+        self.social_bonding = norm_of("social_bonding")
+        self.trust = norm_of("trust")
+        self.cooperation = norm_of("cooperation_instinct")
+        self.intelligence = norm_of("intelligence")
+        self.curiosity = norm_of("curiosity")
+        self.risk_analysis = norm_of("risk_analysis")
+        self.self_preservation = norm_of("self_preservation")
+        self.reproduction_drive = norm_of("reproduction_drive")
+        self.food_search_efficiency = norm_of("food_search_efficiency")
+        self.same_species_pref = norm_of("same_species_preference")
+        self.outsider_tolerance = norm_of("outsider_tolerance")
+        self.pack_instinct = norm_of("pack_instinct")
+        self.altruism = norm_of("altruism")
+        self.hunting_instinct = norm_of("hunting_instinct")
+        self.parental_instinct = norm_of("parental_instinct")
+        self.impulsiveness = norm_of("impulsiveness")
+        self.clan_creation_chance_n = norm_of("clan_creation_chance")
+        self.clan_joining_chance_n = norm_of("clan_joining_chance")
+        self.incest_avoidance = norm_of("incest_avoidance")
+        self.mate_selectiveness = norm_of("mate_selectiveness")
+        self.fertility = real_of("fertility")
+        self.min_energy_repro_fraction = real_of("minimum_energy_for_mating")
+        self.min_age_repro = int(real_of("minimum_age_for_mating"))
+        self.mating_cooldown_ticks = int(real_of("mating_cooldown"))
+        self.retreat_threshold = real_of("retreat_threshold")
+        self.crit_chance = real_of("critical_chance")
+        self.dodge_chance = real_of("dodge_chance")
+        self.digestion_efficiency = real_of("digestion_efficiency")
+        self.energy_absorption = real_of("energy_absorption")
+        self.repro_energy_cost = real_of("reproduction_energy_cost")
 
     def kill(self, cause: str) -> None:
         self._store.alive[self._idx] = False

@@ -31,3 +31,12 @@ Thumbs.db
 save_state.json
 statistics.json
 *.log
+
+# Telemetry database — regenerated every run, grows to 100s of MB.
+# Must never be committed (a >100MB file is rejected by GitHub and was the
+# cause of the failed pushes). Kept on disk, just untracked.
+telemetry.db
+telemetry.db-shm
+telemetry.db-wal
+*.db-wal
+*.db-shm

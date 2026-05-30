@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>λ.life · Analytics</title>
+  <link rel="stylesheet" href="/static/styles.css?v=7" />
+  <style>
+    /* Analytics layout; palette/typography inherited from the token system. */
+    body { grid-template-rows: 62px 1fr; }
+    #analytics-main { padding: 24px 28px 40px; overflow-y: auto; min-height: 0; }
+    .a-section { margin-bottom: 38px; }
+    .a-section > h3 {
+      display: flex; align-items: center; gap: 11px;
+      margin: 4px 0 18px; font: 800 17px "Inter", system-ui, sans-serif;
+      color: var(--text-primary); letter-spacing: 0.3px; text-transform: uppercase;
+      border-bottom: 1px solid var(--glass-border); padding-bottom: 12px;
+    }
+    .a-section > h3::before {
+      content: ""; width: 10px; height: 10px; border-radius: 2px;
+      background: var(--accent-orange); box-shadow: var(--glow-soft);
+    }
+    /* Fixed-track grid (no auto-fill reflow that lets cards collide). Cards
+       have explicit min-heights so neighbouring sections never overlap. */
+    .a-grid { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+    @media (max-width: 1280px) { .a-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 820px)  { .a-grid { grid-template-columns: 1fr; } }
+    .a-card {
+      background:
+        var(--refraction),
+        linear-gradient(180deg, var(--glass-tint), rgba(14,15,20,0.34));
+      backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border); border-radius: var(--radius-panel);
+      padding: 15px 17px; box-shadow: var(--shadow-panel);
+      min-height: 218px; display: flex; flex-direction: column; min-width: 0;
+      transition: transform var(--t-med) var(--spring), box-shadow var(--t-med) var(--ease), border-color var(--t-med) var(--ease);
+    }
+    .a-card.span-2 { grid-column: span 2; }
+    .a-card:hover { transform: translateY(-3px); border-color: rgba(255,138,52,0.3); box-shadow: var(--shadow-panel), var(--glow-soft); }
+    .a-card h4 { margin: 0 0 10px; font: 700 11px "Inter", system-ui, sans-serif; text-transform: uppercase; letter-spacing: 0.9px; color: var(--text-secondary); }
+    .a-card canvas { width: 100%; height: 176px; display: block; flex: 1; min-height: 0; }
+    .a-controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .a-controls label { color: var(--text-muted); font-size: 12.5px; display: flex; gap: 8px; align-items: center; }
+    .a-controls select, .a-controls input {
+      background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-control); padding: 8px 11px; font: 13px "Inter", system-ui, sans-serif;
+    }
+    .a-controls .seg { display: flex; gap: 0; border: 1px solid var(--glass-border); border-radius: var(--radius-control); overflow: hidden; }
+    .a-controls .seg button {
+      background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 0; border-right: 1px solid var(--glass-border);
+      padding: 8px 14px; font: 600 12.5px "Inter", system-ui, sans-serif; cursor: pointer;
+    }
+    .a-controls .seg button:last-child { border-right: 0; }
+    .a-controls .seg button.active { background: linear-gradient(180deg, #ffa356, var(--accent-orange)); color: #20100a; }
+    .stat-line { font: 12px "JetBrains Mono", Consolas, monospace; color: var(--text-secondary); margin-top: 4px; }
+    .stat-line b { color: var(--accent-orange); }
+    .bars { display: flex; flex-direction: column; gap: 6px; }
+    .bar-row { display: flex; align-items: center; gap: 9px; font: 11.5px "JetBrains Mono", Consolas, monospace; }
+    .bar-row .nm { width: 104px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bar-row .track { flex: 1; height: 15px; background: var(--bg-deep); border-radius: 5px; overflow: hidden; }
+    .bar-row .fill { height: 100%; border-radius: 5px; }
+    .bar-row .val { width: 52px; text-align: right; color: var(--text-muted); }
+    .cause-grid { display: flex; gap: 22px; font: 12px "Inter", system-ui, sans-serif; color: var(--text-muted); }
+    .cause-grid div b { display: block; font-size: 28px; font-weight: 800; margin-top: 5px; }
+    .cause-starv b { color: var(--warning); } .cause-age b { color: var(--accent-2); } .cause-combat b { color: var(--bad); }
+    #event-log { max-height: 250px; overflow-y: auto; font: 11.5px "JetBrains Mono", Consolas, monospace; color: var(--text-secondary); line-height: 1.55; white-space: pre-wrap; }
+    /* Genome Explorer — dedicated, stable layout (no auto-fill reflow fights). */
+    #genome-explorer .a-controls { margin-bottom: 16px; }
+    .ge-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+    .ge-hist { min-height: 340px; } .ge-hist canvas { height: 300px; }
+    .ge-species { align-self: stretch; max-height: 360px; overflow-y: auto; }
+    @media (max-width: 1180px) { .ge-grid { grid-template-columns: 1fr; } .ge-species { max-height: 240px; } }
+
+    /* ---- Collective Mind (brain viz centerpiece) ---- */
+    #brain-card { min-height: 520px; padding: 0; overflow: hidden; position: relative; }
+    #brain-canvas { width: 100%; height: 520px; display: block; cursor: grab; }
+    #brain-card .brain-overlay { position: absolute; inset: 0; pointer-events: none; padding: 16px 18px; display: flex; flex-direction: column; justify-content: space-between; }
+    #brain-card .brain-title { display: flex; align-items: baseline; gap: 12px; }
+    #brain-card .brain-title b { font: 800 16px "Inter", system-ui, sans-serif; color: var(--text-primary); letter-spacing: 0.3px; }
+    #brain-card .brain-title i { font-style: normal; font: 600 11px "JetBrains Mono", monospace; color: var(--text-muted); }
+    #brain-legend { display: flex; gap: 16px; flex-wrap: wrap; font: 600 11px "Inter", system-ui, sans-serif; color: var(--text-secondary); }
+    #brain-legend span { display: flex; align-items: center; gap: 6px; }
+    #brain-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px currentColor; }
+    #brain-hint { font: 600 10.5px "JetBrains Mono", monospace; color: var(--text-muted); letter-spacing: 0.5px; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <header id="topbar">
+    <span class="brand"><b>λ</b>.life<i>Analytics</i></span>
+    <nav class="page-nav">
+      <a class="nav-link" href="/">Map</a>
+      <a class="nav-link active" href="/analytics">Analytics</a>
+    </nav>
+    <span class="tb-sep"></span>
+    <div class="mgroup">
+      <span class="metric hero"><b id="m-tick">0</b><i>tick</i></span>
+      <span class="metric hero"><b id="m-pop">0</b><i>population</i></span>
+    </div>
+    <span class="tb-sep"></span>
+    <div class="mgroup">
+      <span class="metric"><b id="m-species">0</b><i>species</i></span>
+      <span class="metric"><b id="m-clans">0</b><i>clans</i></span>
+      <span class="metric"><b id="m-hybrids">0</b><i>hybrids</i></span>
+      <span class="metric"><b id="m-gen">0</b><i>gen</i></span>
+    </div>
+    <span class="tb-sep"></span>
+    <div class="mgroup">
+      <span class="metric"><b id="m-food">0</b><i>food</i></span>
+      <span class="metric"><b id="m-births">0</b><i>births</i></span>
+      <span class="metric"><b id="m-deaths">0</b><i>deaths</i></span>
+    </div>
+    <span class="grow"></span>
+  </header>
+
+  <main id="analytics-main">
+    <!-- COLLECTIVE MIND — 3D neural-net of the population's cognition -->
+    <div class="a-section" id="mind-section">
+      <h3>Collective Mind</h3>
+      <div class="a-controls">
+        <div class="seg" id="mind-mode">
+          <button data-mode="collective" class="active">Collective</button>
+          <button data-mode="creature">Creature</button>
+        </div>
+        <label id="mind-cre-wrap" style="display:none">id <input id="mind-cre-id" type="number" min="1" style="width:90px" placeholder="creature #" /></label>
+        <span id="mind-stat" class="stat-line"></span>
+      </div>
+      <div class="a-card" id="brain-card">
+        <canvas id="brain-canvas"></canvas>
+        <div class="brain-overlay">
+          <div>
+            <div class="brain-title"><b>cognition network</b><i id="brain-sub">sensors → cognition → actions</i></div>
+            <div id="brain-legend" style="margin-top:10px">
+              <span style="color:#78aaff"><i></i>perception</span>
+              <span style="color:#ff963c"><i></i>intellect</span>
+              <span style="color:#ff5c4c"><i></i>instinct</span>
+              <span style="color:#78d282"><i></i>social</span>
+              <span style="color:#f5ebd4"><i></i>action</span>
+            </div>
+          </div>
+          <div id="brain-hint">drag to rotate · scroll to zoom · double-click to reset</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GENOME EXPLORER (prominent, own stable layout) -->
+    <div class="a-section" id="genome-explorer">
+      <h3>Genome Explorer</h3>
+      <div class="a-controls">
+        <label>gene <select id="gene-select"></select></label>
+        <label>bins <input id="gene-bins" type="number" min="6" max="60" value="24" style="width:64px" /></label>
+        <span id="gene-stat" class="stat-line"></span>
+      </div>
+      <div class="ge-grid">
+        <div class="a-card ge-hist">
+          <h4 id="gene-title">distribution</h4>
+          <canvas id="hist-gene"></canvas>
+        </div>
+        <div class="a-card ge-species">
+          <h4>per-species mean</h4>
+          <div id="gene-species" class="bars"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ECOLOGY & POPULATION -->
+    <div class="a-section">
+      <h3>Ecology &amp; Population</h3>
+      <div class="a-grid">
+        <div class="a-card">
+          <h4>population &amp; food</h4>
+          <canvas class="chart" data-series="population,food" data-colors="#ff8a34,#7cb35c"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>births / deaths (per window)</h4>
+          <canvas class="chart" data-series="births_delta,deaths_delta" data-colors="#7cb35c,#ff5e47"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>deaths by cause (cumulative)</h4>
+          <canvas class="chart" data-series="deaths_starvation,deaths_age,deaths_combat" data-colors="#f0a93c,#8b94a6,#ff5e47"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>avg energy / health</h4>
+          <canvas class="chart" data-series="avg_energy,avg_health" data-colors="#ff8a34,#7cb35c"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>age pyramid (age / lifespan)</h4>
+          <canvas id="hist-age"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>energy distribution</h4>
+          <canvas id="hist-energy"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>health distribution</h4>
+          <canvas id="hist-health"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>deaths by cause (totals)</h4>
+          <div class="cause-grid">
+            <div class="cause-starv">starvation<b id="dc-starv">0</b></div>
+            <div class="cause-age">age<b id="dc-age">0</b></div>
+            <div class="cause-combat">combat<b id="dc-combat">0</b></div>
+          </div>
+        </div>
+        <div class="a-card">
+          <h4>species (live, by population)</h4>
+          <div id="species-bars" class="bars"></div>
+        </div>
+        <div class="a-card">
+          <h4>clans (live, by members)</h4>
+          <div id="clan-bars" class="bars"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LINEAGE & EVOLUTION -->
+    <div class="a-section">
+      <h3>Lineage &amp; Evolution</h3>
+      <div class="a-grid">
+        <div class="a-card">
+          <h4>generation distribution (live)</h4>
+          <canvas id="hist-gen"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>max generation over time</h4>
+          <canvas class="chart" data-series="generation_max" data-colors="#cf9054"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>hybrids over time</h4>
+          <canvas class="chart" data-series="hybrids" data-colors="#ff8a34"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>species &amp; clans over time</h4>
+          <canvas class="chart" data-series="species,clans" data-colors="#8b94a6,#ff8a34"></canvas>
+        </div>
+        <div class="a-card">
+          <h4>species emergence (tick founded)</h4>
+          <div id="species-timeline" class="bars"></div>
+        </div>
+        <div class="a-card events" style="grid-column: span 2;">
+          <h4>event timeline <span id="ev-counts"></span></h4>
+          <pre id="event-log"></pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/cursor.js?v=7"></script>
+  <script src="/static/api.js?v=7"></script>
+  <script src="/static/charts.js?v=7"></script>
+  <script src="/static/brainviz.js?v=7"></script>
+  <script src="/static/analytics.js?v=7"></script>
+</body>
+</html>

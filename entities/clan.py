@@ -19,6 +19,10 @@ class Clan:
     ideology: float = 0.5  # 0 = peaceful, 1 = militant
     stability: float = 1.0
     territory_count: int = 0
+    # Active diplomatic state, used to debounce war/alliance events so each
+    # transition is announced once. Derived from `relations`, not saved.
+    at_war: Set[int] = field(default_factory=set)
+    allied: Set[int] = field(default_factory=set)
 
     def add_member(self, creature_id: int) -> None:
         self.members.add(creature_id)

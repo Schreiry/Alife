@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="240" viewBox="0 0 640 240">
+  <style>
+    .axis{stroke:#333;stroke-width:1}
+    .grid{stroke:#ccc;stroke-width:0.6}
+    .label{font:12px sans-serif;fill:#111}
+    .point{fill:#1f77b4}
+    .line{stroke:#1f77b4;stroke-width:2;fill:none}
+  </style>
+  <!-- axes -->
+  <line x1="60" y1="200" x2="600" y2="200" class="axis"/>
+  <line x1="60" y1="200" x2="60" y2="20" class="axis"/>
+  <text x="330" y="230" class="label">Population (approx)</text>
+  <text x="10" y="12" class="label">ms / tick</text>
+
+  <!-- grid lines -->
+  <line x1="60" y1="150" x2="600" y2="150" class="grid"/>
+  <line x1="60" y1="100" x2="600" y2="100" class="grid"/>
+  <line x1="60" y1="50" x2="600" y2="50" class="grid"/>
+
+  <!-- data points mapped roughly: (200,3.5),(1400,12),(2800,36),(3000,58) -->
+  <!-- map pop->x: x = 60 + (pop/3200)*540; map ms->y: y = 200 - (ms/60)*160 -->
+  <path d="M" id="data"/>
+  <polyline points="
+    60,200
+  " class="line"/>
+  <!-- compute points -->
+  <!-- point1 -->
+  <circle cx="60" cy="200" r="0" />
+  <!-- manual points -->
+  <polyline class="line" points="92,195 300,168 520,95 560,50" />
+  <circle class="point" cx="92" cy="195" r="4"/>
+  <text x="96" y="190" class="label">200: ~3.5ms</text>
+  <circle class="point" cx="300" cy="168" r="4"/>
+  <text x="304" y="163" class="label">1400: ~12ms</text>
+  <circle class="point" cx="520" cy="95" r="4"/>
+  <text x="524" y="90" class="label">2800: ~36ms</text>
+  <circle class="point" cx="560" cy="50" r="4"/>
+  <text x="564" y="45" class="label">3000: ~56ms</text>
+</svg>

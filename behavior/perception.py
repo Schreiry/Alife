@@ -40,6 +40,9 @@ class Perception:
     nearby_enemies: int = 0
     nearby_allies: int = 0
     local_danger: float = 0.0
+    # Resource-ecology sensor reads of the creature's current cell.
+    local_food: float = 1.0          # current biomass / capacity, [0,1]
+    resource_depletion: float = 0.0  # over-grazing memory, [0,1]
     own_tile_owner: Optional[int] = None
     is_on_own_clan_tile: bool = False
     is_on_enemy_clan_tile: bool = False
@@ -148,6 +151,9 @@ def perceive(creature: Creature, world) -> Perception:
     if mate_idx >= 0:
         p.closest_mate = world.creature_by_idx[mate_idx]
         p.closest_mate_dist = float(np.sqrt(out[PERC_MATE_D2]))
+
+    # Resource-ecology sensor: single coarse-cell lookup, like territory.
+    p.local_food, p.resource_depletion = world.ecology.sample(cx, cy)
 
     # Tile ownership stays a Python check — it's a single array index.
     owner = world.territory.clan_owns(int(cx), int(cy))

@@ -170,14 +170,14 @@ GENE_CATALOG: List[GeneSpec] = [
     GeneSpec("mate_selectiveness",      0.0,  1.0, "reproduction"),
     GeneSpec("attraction_strength",     0.0,  1.0, "reproduction"),
     GeneSpec("genetic_compatibility_range",0.1,1.0,"reproduction"),
-    GeneSpec("minimum_energy_for_mating",0.3, 0.85,"reproduction"),
-    GeneSpec("minimum_age_for_mating",  40.0, 300.0,"reproduction"),
+    GeneSpec("minimum_energy_for_mating",0.25, 0.55,"reproduction"),
+    GeneSpec("minimum_age_for_mating",  30.0, 150.0,"reproduction"),
     GeneSpec("offspring_count_min",     1.0,  3.0, "reproduction"),
     GeneSpec("offspring_count_max",     1.0,  5.0, "reproduction"),
     GeneSpec("offspring_care_duration", 0.0,200.0, "reproduction"),
     GeneSpec("parental_energy_investment",0.0, 0.5,"reproduction"),
     GeneSpec("pair_bond_strength",      0.0,  1.0, "reproduction"),
-    GeneSpec("mating_cooldown",        60.0,300.0, "reproduction"),
+    GeneSpec("mating_cooldown",        40.0,160.0, "reproduction"),
     GeneSpec("pregnancy_duration",     30.0,150.0, "reproduction"),
     GeneSpec("child_survival_bonus",    0.0,  1.0, "reproduction"),
     GeneSpec("incest_avoidance",        0.0,  1.0, "reproduction"),
@@ -219,6 +219,42 @@ GENE_RANGES: Tuple[Tuple[float, float], ...] = tuple(
     (spec.real_min, spec.real_max) for spec in GENE_CATALOG
 )
 
+# Genes whose values currently drive observable phenotype/behavior.
+# Source of truth: Creature.attach_phenotype + reproduction/combat/brain
+# gating. Genes outside this set are *dormant* — they still mutate, inherit
+# and serialize (so future expression code can pick them up without
+# breaking saves), but they don't influence simulation outcomes yet.
+ACTIVE_GENES: frozenset[str] = frozenset({
+    # Physical (SoA-expressed)
+    "max_health", "energy_capacity", "movement_speed", "vision_range",
+    "lifespan", "aging_speed", "regeneration_rate",
+    # Combat
+    "attack_power", "defense_power", "dodge_chance", "critical_chance",
+    "retreat_threshold", "victory_confidence_gain",
+    # Metabolic
+    "base_energy_consumption", "movement_energy_cost", "attack_energy_cost",
+    "starvation_damage_rate", "digestion_efficiency", "energy_absorption",
+    "food_search_efficiency",
+    # Reproduction
+    "reproduction_energy_cost", "fertility", "mate_selectiveness",
+    "genetic_compatibility_range", "minimum_energy_for_mating",
+    "minimum_age_for_mating", "mating_cooldown",
+    "offspring_count_min", "offspring_count_max", "incest_avoidance",
+    # Brain / instinct / social
+    "aggression", "fear", "territoriality", "expansion_drive",
+    "leadership", "social_bonding", "trust", "cooperation_instinct",
+    "intelligence", "curiosity", "risk_analysis", "self_preservation",
+    "reproduction_drive", "same_species_preference", "outsider_tolerance",
+    "pack_instinct", "altruism", "hunting_instinct", "parental_instinct",
+    "impulsiveness", "clan_creation_chance", "clan_joining_chance",
+    "dominance_drive", "submission_tendency",
+    # Mutation control
+    "mutation_rate", "mutation_strength", "mutation_resistance",
+    "hybrid_instability",
+    # Appearance
+    "color_r", "color_g", "color_b", "clan_color_affinity",
+})
+
 
 def real_value(name: str, normalized: float) -> float:
     """Convert a normalized gene value (0..1) into its real-world scale."""
@@ -237,3 +273,7 @@ def clamp01(value: float) -> float:
     if value > 1.0:
         return 1.0
     return value
+
+
+def is_active(name: str) -> bool:
+    return name in ACTIVE_GENES

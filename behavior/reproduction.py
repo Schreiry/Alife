@@ -23,12 +23,23 @@ def can_reproduce(a: Creature, b: Creature) -> bool:
     ):
         return False
 
+    # Factor 1 — biological compatibility: genetic distance must fall inside
+    # the pair's averaged compatibility window. (Factor 3, spatial contact, is
+    # enforced by the caller: attempt_reproduction only fires when the two are
+    # within mating distance on the map.)
     distance = a.genome.distance(b.genome)
     compat_window = 0.5 * (
         a.genome.real("genetic_compatibility_range")
         + b.genome.real("genetic_compatibility_range")
     )
     if distance > compat_window:
+        return False
+
+    # Factor 2 — social acceptance: only gates *cross-species* pairings. Same
+    # species mate freely (subject to the checks above); a would-be hybrid must
+    # clear a tolerance threshold, which is what keeps hybrids rare instead of
+    # rampant the moment two species coexist.
+    if a.species_id != b.species_id and not _cross_species_accepted(a, b):
         return False
 
     # Incest avoidance — if creatures share a parent, applied genetically.
@@ -46,6 +57,22 @@ def can_reproduce(a: Creature, b: Creature) -> bool:
             return False
 
     return True
+
+
+def _cross_species_accepted(a: Creature, b: Creature) -> bool:
+    """Social-acceptance gate for a cross-species (hybrid) pairing. High
+    mixed_species_acceptance / outsider_tolerance push toward acceptance;
+    same_species_preference and fear push against it."""
+    def avg(name: str) -> float:
+        return 0.5 * (a.genome.normalized(name) + b.genome.normalized(name))
+
+    acceptance = (
+        avg("mixed_species_acceptance")
+        + config.CROSS_SPECIES_TOLERANCE_WEIGHT * avg("outsider_tolerance")
+        - config.CROSS_SPECIES_PREFERENCE_PENALTY * avg("same_species_preference")
+        - config.CROSS_SPECIES_FEAR_WEIGHT * avg("fear")
+    )
+    return acceptance >= config.CROSS_SPECIES_MATE_THRESHOLD
 
 
 def attempt_reproduction(a: Creature, b: Creature, world, rng) -> int:
@@ -103,6 +130,7 @@ def attempt_reproduction(a: Creature, b: Creature, world, rng) -> int:
             generation=gen,
             clan_id=clan_id,
             is_hybrid=is_hybrid,
+            parent_species_id=a.species_id,
             energy_fraction=config.NEWBORN_ENERGY_FRACTION,
             health_fraction=config.NEWBORN_HEALTH_FRACTION,
         )
@@ -110,6 +138,23 @@ def attempt_reproduction(a: Creature, b: Creature, world, rng) -> int:
             break
         spawned += 1
         world.births_total += 1
+        world.emit("birth", {
+            "id": child.id,
+            "parents": [a.id, b.id],
+            "generation": child.generation,
+            "is_hybrid": is_hybrid,
+            "species": int(child.species_id),
+            "clan": child.clan_id,
+        })
+        # Distinct species-level history event for cross-species offspring, so
+        # hybrids are filterable in the EventLog/timeline (not buried in births).
+        if is_hybrid:
+            world.emit("hybrid_born", {
+                "id": child.id,
+                "parents": [a.id, b.id],
+                "parent_species": [int(a.species_id), int(b.species_id)],
+                "generation": child.generation,
+            })
 
     if spawned > 0:
         cost = a.repro_energy_cost * 0.5
